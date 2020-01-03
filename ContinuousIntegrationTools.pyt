@@ -12,8 +12,9 @@ import arcpy, configparser, os, getopt, json,urllib, ssl
 
 import urllib.request
 
-iniFileName = 'gispro-python-deploy.ini'
+iniFileName = 'gispro-ci-tools.ini'
 selfsigned = True
+bypassproxyonlocal = True
 
 if not hasattr(sys, 'argv'):
     sys.argv  = ['']
@@ -79,13 +80,6 @@ class MapToJSONTool(object):
             parameterType="Required",
             direction="Input")
 
-        register = arcpy.Parameter(
-            displayName="Register connections with ArcGIS Server",
-            name="check_datasources",
-            datatype="GPBoolean",
-            parameterType="Optional",
-            direction="Input")
-
         outjson = arcpy.Parameter(
             displayName="Output JSON",
             name="out_json",
@@ -94,7 +88,7 @@ class MapToJSONTool(object):
             direction="Output")
 
 
-        params = [inmap, arcgisServer, username, password, register, outjson]
+        params = [inmap, arcgisServer, username, password,  outjson]
 
         return params
 
@@ -117,11 +111,10 @@ class MapToJSONTool(object):
     def execute(self, parameters, messages):
         """The source code of the tool."""
         arcgisprodocument = parameters[0].value.value
-        jsonfile = parameters[5].value.value
+        jsonfile = parameters[4].value.value
         username = parameters[2].value
         password = parameters[3].value
         server = parameters[1].value
-        register = parameters[4].value
         #read ini file
         configreader = Configuration()
         configuration = configreader.readSection(server)
@@ -274,10 +267,35 @@ class ArcgisServerDatasources(object):
         for item in datasources['items']:
             path =item['path']
             item['cicdname'] = path.split(r'/')[-1]
+
+        message = "Datastores read from ArcGIS Server"
+        arcpy.AddMessage(message)
         return datasources
 
-    def registerDatasource(self, datasource):
-        pass
+    def registerDatasource(self, datasource, connectionstring):
+        url = self.serverurl +  '/admin/data/validateDataItem'
+
+        parameters = {
+             'f': 'json',
+             'item': '{"type":"egdb","info":{"dataStoreConnectionType":"shared","isManaged":false,"connectionString":"'+connectionstring+'"},"path":"/enterpriseDatabases/'+datasource+'"}'
+        }
+        if self.token is not None:
+            parameters['token'] = self.token
+
+        data = self.RequestWithToken(url, parameters)
+        result = json.loads(data)
+        if result['status'] =='success':
+            url = self.serverurl +  '/admin/data/registerItem'
+            data = self.RequestWithToken(url, parameters)
+            result = json.loads(data)
+            if  result['success']:
+                message = "Datastore registered with ArcGIS Server: " + datasource
+                arcpy.AddMessage(message)
+            else:
+                message = "Datastore not registered with ArcGIS Server: " + datasource
+                arcpy.AddWarning(message)
+        else:
+            arcpy.AddWarning("Datastores not valid" + datasource)
 
     def GetToken(self, tokenURL, referer, username, password):
         # Token URL is typically http://portalserver.domain.tld/portalwebadapter/sharing/rest/generateToken
@@ -285,9 +303,9 @@ class ArcgisServerDatasources(object):
         params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8")
 
         headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-        if '.local' not in tokenURL:
+        if '.local' not in url and bypassproxyonlocal:
             pr = urllib.request.ProxyHandler()
-            logging.info(pr.proxies)
+            print.info(pr.proxies)
         else:
             proxy_handler = urllib.request.ProxyHandler({})
             opener = urllib.request.build_opener(proxy_handler)
@@ -321,7 +339,7 @@ class ArcgisServerDatasources(object):
             #force urllib.request NOT to use a proxy, only internal servers!
             #try with default proxy's
             #portal is available via an external url
-            if '.local' not in url:
+            if '.local' not in url and bypassproxyonlocal:
                 pr = urllib.request.ProxyHandler()
             else:
                 proxy_handler = urllib.request.ProxyHandler({})
@@ -344,7 +362,6 @@ class ArcgisServerDatasources(object):
                         resp =  result.read()
                         return resp
                 else:
-                    logging.info(headers)
                     request  = urllib.request.Request(url, data, headers)
                     with urllib.request.urlopen(request,context=ctx,timeout =timeout ) as result:
                         resp =  result.read()
@@ -354,7 +371,7 @@ class ArcgisServerDatasources(object):
                     resp =  result.read()
                     return resp
         except Exception as e:
-            #logging.exception("Error opening url" + url)
+            arcpy.AddError(str(e))
             raise e
 
 
@@ -364,42 +381,56 @@ class MapToJSON(object):
         with open(promap,"r") as inputfile:
             data = inputfile.read()
             json_map = json.loads(data)
+        message = 'Reading:' + promap
+        arcpy.AddMessage(message)
 
         serverDatasources = ArcgisServerDatasources(configuration, username, password)
         datasources = serverDatasources.getDatasources()
-        self.replaceDataSources(json_map, datasources)
+        self.replaceDataSources(json_map, datasources, serverDatasources)
+
+        message = 'Writing:' + jsonfile
+        arcpy.AddMessage(message)
         with open(jsonfile, 'w' ) as outputfile:
             json.dump(json_map, outputfile, indent=4, sort_keys=True,separators=(',', ': '))
 
-    def replaceDataSources(self, json_map, datasources):
-        self.findDataSources(json_map, datasources)
+    def replaceDataSources(self, json_map, datasources, serverDatasources):
+        self.findDataSources(json_map, datasources, serverDatasources)
 
-    def findDataSources(self, js, datasources):
+    def findDataSources(self, js, datasources, serverDatasources):
         for key in js:
-            print(str(key))
             if type(key) is dict or type(key) is list:
                 if 'dataConnection' in key:
-                    self.replaceDataSource(key['dataConnection'], datasources)
+                    self.replaceDataSource(key['dataConnection'], datasources, serverDatasources)
                 else:
-                    self.findDataSources(key, datasources)
+                    self.findDataSources(key, datasources, serverDatasources)
             elif type(js) is dict and (type(js[key]) is dict or type(js[key]) is list):
                 if 'dataConnection' in js[key]:
-                    self.replaceDataSource(js[key]['dataConnection'], datasources)
+                    self.replaceDataSource(js[key]['dataConnection'], datasources, serverDatasources)
                 else:
-                    self.findDataSources(js[key], datasources)
+                    self.findDataSources(js[key], datasources, serverDatasources)
 
 
-    def replaceDataSource(self, dataConnection, datasources):
+    def replaceDataSource(self, dataConnection, datasources, serverDatasources):
         if dataConnection['workspaceFactory'] =='SDE':
             workspaceConnectionString =  dataConnection['workspaceConnectionString']
             found = False
             for ds in datasources['items']:
                 if self.compareConnectionString(ds['info']['connectionString'],workspaceConnectionString):
                     dataConnection['workspaceConnectionString'] = ds['cicdname'].split('@')[0]
+                    arcpy.AddMessage('Replaced: ' + ds['cicdname'].split('@')[0] )
                     found = True
                     continue
             if not found:
-                pass #TODO register connectionstring with server
+                dsname = ''
+                key = ''
+                csdict = self.connectionStringToDict(workspaceConnectionString)
+                if 'USER' in csdict:
+                    dsname = csdict['USER']
+                    key = csdict['USER']
+                if 'DATABASE' in csdict:
+                    dsname = dsname + '@' + csdict['DATABASE']
+                serverDatasources.registerDatasource(dsname, workspaceConnectionString)
+                dataConnection['workspaceConnectionString'] = key
 
     def connectionStringToDict(self, connectionstring):
         c_props = connectionstring.split(";")
@@ -430,9 +461,14 @@ class JSONToMap(object):
             data = inputfile.read()
             json_map = json.loads(data)
 
+        message = 'Reading:' + jsonfile
+        arcpy.AddMessage(message)
         serverDatasources = ArcgisServerDatasources(configuration, username, password)
         datasources = serverDatasources.getDatasources()
         self.replaceDataSources(json_map, datasources, database)
+
+        message = 'Writing:' + prodocument
+        arcpy.AddMessage(message)
         with open(prodocument, 'w' ) as outputfile:
             json.dump(json_map, outputfile, indent=4, sort_keys=True,separators=(',', ': '))
 
@@ -441,7 +477,6 @@ class JSONToMap(object):
 
     def findDataSources(self, js, datasources, database):
         for key in js:
-            print(str(key))
             if type(key) is dict or type(key) is list:
                 if 'dataConnection' in key:
                     self.replaceDataSource(key['dataConnection'], datasources, database)
@@ -456,8 +491,8 @@ class JSONToMap(object):
         if dataConnection['workspaceFactory'] =='SDE':
             workspaceConnectionString =  dataConnection['workspaceConnectionString']
             found = False
+            arcpy.AddMessage("Restore connection: " + workspaceConnectionString)
             for ds in datasources['items']:
-                arcpy.AddMessage(ds['cicdname'])
                 if (database !='' and '@' in ds['cicdname'] and ds['cicdname'].split('@')[1].upper() == database.upper() and workspaceConnectionString == ds['cicdname'].split('@')[0]) or (database =='' and workspaceConnectionString == ds['cicdname'].split('@')[0]):
                     dataConnection['workspaceConnectionString'] = ds['info']['connectionString']
                     if 'dataset' in dataConnection and len(dataConnection['dataset'].split('.')) == 3:
@@ -467,7 +502,7 @@ class JSONToMap(object):
                     found = True
                     continue
             if not found:
-                pass #TODO
+                arcpy.AddWarning("Could not restore connection")
 
     def connectionStringToDict(self, connectionstring):
         c_props = connectionstring.split(";")
