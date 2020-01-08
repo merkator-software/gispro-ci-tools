@@ -349,7 +349,7 @@ class ArcgisServerDatasources(object):
             #force urllib.request NOT to use a proxy, only internal servers!
             #try with default proxy's
             #portal is available via an external url
-            if '.local' not in url and bypassproxyonlocal:
+            if '.local' not in url or bypassproxyonlocal:
                 pr = urllib.request.ProxyHandler()
             else:
                 proxy_handler = urllib.request.ProxyHandler({})
