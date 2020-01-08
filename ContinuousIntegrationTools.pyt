@@ -437,8 +437,10 @@ class MapToJSON(object):
                 if 'USER' in csdict:
                     dsname = csdict['USER']
                     key = csdict['USER']
-                if 'DATABASE' in csdict:
+                if 'DATABASE' in csdict: #postgres
                     dsname = dsname + '@' + csdict['DATABASE']
+                if 'SERVER' in csdict: #oracle
+                    dsname = dsname + '@' + csdict['INSTANCE'].split(':')[-1]
                 serverDatasources.registerDatasource(dsname, workspaceConnectionString)
                 dataConnection['workspaceConnectionString'] = key
 
