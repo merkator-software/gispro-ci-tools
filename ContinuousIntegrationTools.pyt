@@ -500,12 +500,14 @@ class JSONToMap(object):
                 else:
                     self.findDataSources(js[key], datasources, database)
     def replaceDataSource(self, dataConnection, datasources, database):
+        if database == None:
+            database = ''
         if dataConnection['workspaceFactory'] =='SDE':
             workspaceConnectionString =  dataConnection['workspaceConnectionString']
             found = False
             arcpy.AddMessage("Restore connection: " + workspaceConnectionString)
             for ds in datasources['items']:
-                if (database !='' and '@' in ds['cicdname'] and ds['cicdname'].split('@')[1].upper() == database.upper() and workspaceConnectionString == ds['cicdname'].split('@')[0]) or (database =='' and workspaceConnectionString == ds['cicdname'].split('@')[0]):
+                if (database !='' and '@' in ds['cicdname'] and ds['cicdname'].split('@')[1].upper() == database.upper() and workspaceConnectionString.upper() == ds['cicdname'].split('@')[0].upper()) or (database =='' and workspaceConnectionString.upper() == ds['cicdname'].split('@')[0].upper()):
                     dataConnection['workspaceConnectionString'] = ds['info']['connectionString']
                     if 'dataset' in dataConnection and len(dataConnection['dataset'].split('.')) == 3:
                         connectiondict = self.connectionStringToDict( dataConnection['workspaceConnectionString'])
