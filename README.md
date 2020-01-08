@@ -35,8 +35,8 @@ The database connection names must be formatted with <username>@<database>. The 
 You can use this mechanism to update your connectionstrings very quickly from STAGING to PRODUCTION. Run MapToJSON with a Mapx using your staging Database and the Staging Environment and then run JSONTOMap using the Production Environment to create a Mapx which uses the Production database.
   
 # Remarks
-- I tested with a SDE Enabled PostGIS database, other Enterprise Geodatabases should also work
-- The Standalone server should work, but I didn't have one available, so this is also not tested. 
+- The toolbox is tested with Postgres and Oracle databases
+- The toolbox is tested with federated and standalone (6443 only) servers
 
 # gispro-python-deploy tools
 This toolbox is also part of gispro-python-deploy, a CI/CI Solution for Jenkins to automate creating and sharing Mapservices. Contact us at info(AT]merkator.com for more information.
