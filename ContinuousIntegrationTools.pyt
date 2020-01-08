@@ -250,12 +250,25 @@ class ArcgisServerDatasources(object):
             self.serverurl = configuration['serverurl']
         if 'federated' in configuration:
             self.isFederated = configuration['federated'] == 'true'
-        if self.isFederated:
+        if self.isFederated and ':6443' not in self.serverurl:
             signInResponse = arcpy.SignInToPortal(self.portalurl, username, password)
             self.token = signInResponse['token']
+        elif self.isFederated and ':6443' in self.serverurl:
+            referer = None
+            if 'referer' in configuration:
+                referer = configuration['referer']
+                arcpy.AddMessage(referer)
+            tokenurl = '/admin/generateToken'
+            if 'tokenurl' in configuration:
+                tokenurl = configuration['tokenurl']
+                arcpy.AddMessage(tokenurl)
+            self.token = self.GetToken(tokenurl, referer, username, password)
         else:
-            referer = self.serverurl + "/admin/login"
-            self.token = self.GetToken(self.serverurl + '/admin/generateToken', referer, username, password)
+            referer = None
+            tokenurl = '/admin/generateToken'
+            if 'tokenurl' in configuration:
+                tokenurl = configuration['tokenurl']
+            self.token = self.GetToken(tokenurl, referer, username, password)
     def getDatasources(self):
         url = self.serverurl + '/admin/data/findItems'
         parameters = { 'f'     : 'pjson', 'parentPath': r'/enterpriseDatabases', 'types': 'egdb'}
@@ -299,13 +312,13 @@ class ArcgisServerDatasources(object):
 
     def GetToken(self, tokenURL, referer, username, password):
         # Token URL is typically http://portalserver.domain.tld/portalwebadapter/sharing/rest/generateToken
-
+        if referer is None:
         params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8")
-
+        else:
+            params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'referer', 'referer': referer,'f': 'json'}).encode("utf-8") #portal token request
         headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-        if '.local' not in url and bypassproxyonlocal:
+        if '.local' not in tokenURL or bypassproxyonlocal:
             pr = urllib.request.ProxyHandler()
-            print.info(pr.proxies)
         else:
             proxy_handler = urllib.request.ProxyHandler({})
             opener = urllib.request.build_opener(proxy_handler)
@@ -325,10 +338,7 @@ class ArcgisServerDatasources(object):
         data = result.read()
 
 
-        # Check that data returned is not an error object
-        if not self.AssertJsonSuccess(data):
-            raise Exception ("Login failed:"  + str(data))
-            return
+        
 
         # Extract the token from it
         token = json.loads(data)
