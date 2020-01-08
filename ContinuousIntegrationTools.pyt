@@ -243,6 +243,7 @@ class ArcgisServerDatasources(object):
     portalurl = None
     serverurl = None
     isFederated = None
+    newRegistered = []
     def __init__(self, configuration, username, password):
         if 'portalurl' in configuration:
             self.portalurl = configuration['portalurl']
@@ -286,6 +287,7 @@ class ArcgisServerDatasources(object):
         return datasources
 
     def registerDatasource(self, datasource, connectionstring):
+        if datasource not in self.newRegistered:
         url = self.serverurl +  '/admin/data/validateDataItem'
 
         parameters = {
@@ -302,6 +304,7 @@ class ArcgisServerDatasources(object):
             data = self.RequestWithToken(url, parameters)
             result = json.loads(data)
             if  result['success']:
+                    self.newRegistered.append(datasource)
                 message = "Datastore registered with ArcGIS Server: " + datasource
                 arcpy.AddMessage(message)
             else:
