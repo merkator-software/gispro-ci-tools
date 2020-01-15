@@ -74,7 +74,7 @@ class MapToJSONTool(object):
             direction="Input")
 
         password = arcpy.Parameter(
-            displayName="Administrative User",
+            displayName="Password",
             name="password",
             datatype="GPStringHidden",
             parameterType="Required",
@@ -165,7 +165,7 @@ class JSONToMapTool(object):
             direction="Input")
 
         password = arcpy.Parameter(
-            displayName="Administrative User",
+            displayName="Password",
             name="password",
             datatype="GPStringHidden",
             parameterType="Required",
@@ -288,35 +288,35 @@ class ArcgisServerDatasources(object):
 
     def registerDatasource(self, datasource, connectionstring):
         if datasource not in self.newRegistered:
-        url = self.serverurl +  '/admin/data/validateDataItem'
+            url = self.serverurl +  '/admin/data/validateDataItem'
 
-        parameters = {
-             'f': 'json',
-             'item': '{"type":"egdb","info":{"dataStoreConnectionType":"shared","isManaged":false,"connectionString":"'+connectionstring+'"},"path":"/enterpriseDatabases/'+datasource+'"}'
-        }
-        if self.token is not None:
-            parameters['token'] = self.token
+            parameters = {
+                 'f': 'json',
+                 'item': '{"type":"egdb","info":{"dataStoreConnectionType":"shared","isManaged":false,"connectionString":"'+connectionstring+'"},"path":"/enterpriseDatabases/'+datasource+'"}'
+            }
+            if self.token is not None:
+                parameters['token'] = self.token
 
-        data = self.RequestWithToken(url, parameters)
-        result = json.loads(data)
-        if result['status'] =='success':
-            url = self.serverurl +  '/admin/data/registerItem'
             data = self.RequestWithToken(url, parameters)
             result = json.loads(data)
-            if  result['success']:
+            if result['status'] =='success':
+                url = self.serverurl +  '/admin/data/registerItem'
+                data = self.RequestWithToken(url, parameters)
+                result = json.loads(data)
+                if  result['success']:
                     self.newRegistered.append(datasource)
-                message = "Datastore registered with ArcGIS Server: " + datasource
-                arcpy.AddMessage(message)
+                    message = "Datastore registered with ArcGIS Server: " + datasource
+                    arcpy.AddMessage(message)
+                else:
+                    message = "Datastore not registered with ArcGIS Server: " + datasource
+                    arcpy.AddWarning(message)
             else:
-                message = "Datastore not registered with ArcGIS Server: " + datasource
-                arcpy.AddWarning(message)
-        else:
-            arcpy.AddWarning("Datastores not valid" + datasource)
+                arcpy.AddWarning("Datastores not valid" + datasource)
 
     def GetToken(self, tokenURL, referer, username, password):
         # Token URL is typically http://portalserver.domain.tld/portalwebadapter/sharing/rest/generateToken
         if referer is None:
-        params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8")
+            params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8")
         else:
             params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'referer', 'referer': referer,'f': 'json'}).encode("utf-8") #portal token request
         headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
