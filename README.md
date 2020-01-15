@@ -12,6 +12,7 @@ The toolbox uses a global configurationfile with urls to your ArcGIS Server and 
 - TEMPLATE: publicurl = the public url of your ArcGIS Server (reserved for future use)
 
 If you have a Staging and Production Enviroment copy the TEMPLATE Section and rename the first section to STAGING and the second section to PRODUCTION and configure CONFIGSECTIONS: arcgissections = STAGING,PRODUCTION
+If your ArcGIS Server is federated, but administrative access is disabled on the webadaptor, configure the serverurl with port 6443 and configure the referer with https://your.arcgis.server:6443/arcgis/admin
 
 # Usage
 Writing to JSON:
@@ -34,8 +35,8 @@ The database connection names must be formatted with <username>@<database>. The 
 You can use this mechanism to update your connectionstrings very quickly from STAGING to PRODUCTION. Run MapToJSON with a Mapx using your staging Database and the Staging Environment and then run JSONTOMap using the Production Environment to create a Mapx which uses the Production database.
   
 # Remarks
-- I tested with a SDE Enabled PostGIS database, other Enterprise Geodatabases should also work
-- The Standalone server should work, but I didn't have one available, so this is also not tested. 
+- The toolbox is tested with Postgres and Oracle databases
+- The toolbox is tested with federated and standalone (6443 only) servers
 
 # gispro-python-deploy tools
 This toolbox is also part of gispro-python-deploy, a CI/CI Solution for Jenkins to automate creating and sharing Mapservices. Contact us at info(AT]merkator.com for more information.
