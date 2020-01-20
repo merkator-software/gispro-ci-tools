@@ -422,8 +422,17 @@ class MapToJSON(object):
                 else:
                     self.findDataSources(js[key], datasources, serverDatasources)
 
-
     def replaceDataSource(self, dataConnection, datasources, serverDatasources):
+        if dataConnection['type'] =='CIMRelQueryTableDataConnection':
+            self.replaceRelationDataSource(dataConnection,datasources,serverDatasources)
+        elif dataConnection['type'] =='CIMStandardDataConnection' or dataConnection['type'] =='CIMSqlQueryDataConnection':
+            self.replaceTableDataSource(dataConnection,datasources,serverDatasources)
+
+    def replaceRelationDataSource(self, dataConnection, datasources, serverDatasources):
+        self.replaceTableDataSource(dataConnection['sourceTable'], datasources, serverDatasources)
+        self.replaceTableDataSource(dataConnection['destinationTable'], datasources, serverDatasources)
+
+    def replaceTableDataSource(self, dataConnection, datasources, serverDatasources):
         if dataConnection['workspaceFactory'] =='SDE':
             workspaceConnectionString =  dataConnection['workspaceConnectionString']
             found = False
@@ -502,7 +511,18 @@ class JSONToMap(object):
                     self.replaceDataSource(js[key]['dataConnection'], datasources, database)
                 else:
                     self.findDataSources(js[key], datasources, database)
+
     def replaceDataSource(self, dataConnection, datasources, database):
+        if dataConnection['type'] =='CIMRelQueryTableDataConnection' :
+            self.replaceRelationDataSource(dataConnection,datasources,database)
+        elif dataConnection['type'] =='CIMStandardDataConnection' or dataConnection['type'] =='CIMSqlQueryDataConnection':
+            self.replaceTableDataSource(dataConnection,datasources,database)
+
+    def replaceRelationDataSource(self, dataConnection, datasources, database):
+        self.replaceTableDataSource(dataConnection['sourceTable'], datasources, database)
+        self.replaceTableDataSource(dataConnection['destinationTable'], datasources, database)
+
+    def replaceTableDataSource(self, dataConnection, datasources, database):
         if database == None:
             database = ''
         if dataConnection['workspaceFactory'] =='SDE':
