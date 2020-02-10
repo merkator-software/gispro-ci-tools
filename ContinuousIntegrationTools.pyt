@@ -326,10 +326,6 @@ class ArcgisServerDatasources(object):
             proxy_handler = urllib.request.ProxyHandler({})
             opener = urllib.request.build_opener(proxy_handler)
             urllib.request.install_opener(opener)
-        ctx = ssl.create_default_context()
-        if selfsigned:
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
 
         # Connect to URL and post parameters
         request = urllib.request.Request(tokenURL)
@@ -337,11 +333,8 @@ class ArcgisServerDatasources(object):
             request.add_header(item, headers[item])
         #request.add_data(params)
 
-        result = urllib.request.urlopen(request,data=params, timeout= 500, context=ctx)
+        result = urllib.request.urlopen(request,data=params, timeout= 500)
         data = result.read()
-
-
-        
 
         # Extract the token from it
         token = json.loads(data)
@@ -358,10 +351,6 @@ class ArcgisServerDatasources(object):
                 proxy_handler = urllib.request.ProxyHandler({})
                 opener = urllib.request.build_opener(proxy_handler)
                 urllib.request.install_opener(opener)
-            ctx = ssl.create_default_context()
-            if selfsigned:
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
 
             # generate response
             request = urllib.request.Request(url)
@@ -371,16 +360,16 @@ class ArcgisServerDatasources(object):
             if data is not None:
                 if type(data) is not str:
                     data = urllib.parse.urlencode(data).encode("utf-8")
-                    with urllib.request.urlopen(request,data=data,context=ctx, timeout =timeout ) as result:
+                    with urllib.request.urlopen(request,data=data, timeout =timeout ) as result:
                         resp =  result.read()
                         return resp
                 else:
                     request  = urllib.request.Request(url, data, headers)
-                    with urllib.request.urlopen(request,context=ctx,timeout =timeout ) as result:
+                    with urllib.request.urlopen(request,timeout =timeout ) as result:
                         resp =  result.read()
                         return resp
             else:
-                with urllib.request.urlopen(request,context=ctx,timeout =timeout ) as result:
+                with urllib.request.urlopen(request,timeout =timeout ) as result:
                     resp =  result.read()
                     return resp
         except Exception as e:
