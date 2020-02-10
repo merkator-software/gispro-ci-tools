@@ -10,6 +10,7 @@ The toolbox uses a global configurationfile with urls to your ArcGIS Server and 
 - TEMPLATE: serverurl = the administrative url of your ArcGIS Server
 - TEMPLATE: federated = true/false: true if the ArcGIS Server is federated, false when the ArcGIS Server is standalone
 - TEMPLATE: publicurl = the public url of your ArcGIS Server (reserved for future use)
+- TEMPLATE: proxy = the url of your proxyserver, will be used when useproxy is selected in the tools to override system default proxy
 
 If you have a Staging and Production Enviroment copy the TEMPLATE Section and rename the first section to STAGING and the second section to PRODUCTION and configure CONFIGSECTIONS: arcgissections = STAGING,PRODUCTION
 If your ArcGIS Server is federated, but administrative access is disabled on the webadaptor, configure the serverurl with port 6443 and configure the referer with https://your.arcgis.server:6443/arcgis/admin

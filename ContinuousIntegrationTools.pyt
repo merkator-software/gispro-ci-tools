@@ -13,8 +13,6 @@ import arcpy, configparser, os, getopt, json,urllib, ssl
 import urllib.request
 
 iniFileName = 'gispro-ci-tools.ini'
-selfsigned = True
-bypassproxyonlocal = True
 
 if not hasattr(sys, 'argv'):
     sys.argv  = ['']
@@ -80,6 +78,13 @@ class MapToJSONTool(object):
             parameterType="Required",
             direction="Input")
 
+        proxy = arcpy.Parameter(
+            displayName="Use Proxy",
+            name="proxy",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
         outjson = arcpy.Parameter(
             displayName="Output JSON",
             name="out_json",
@@ -88,7 +93,7 @@ class MapToJSONTool(object):
             direction="Output")
 
 
-        params = [inmap, arcgisServer, username, password,  outjson]
+        params = [inmap, arcgisServer, username, password,  outjson, proxy]
 
         return params
 
@@ -115,13 +120,14 @@ class MapToJSONTool(object):
         username = parameters[2].value
         password = parameters[3].value
         server = parameters[1].value
+        proxy = parameters[5].value
         #read ini file
         configreader = Configuration()
         configuration = configreader.readSection(server)
 
 
         writer = MapToJSON()
-        writer.execute(arcgisprodocument, jsonfile, username, password, configuration)
+        writer.execute(arcgisprodocument, jsonfile, username, password, configuration, proxy)
         return
 
 class JSONToMapTool(object):
@@ -178,6 +184,13 @@ class JSONToMapTool(object):
             parameterType="Optional",
             direction="Input")
 
+        proxy = arcpy.Parameter(
+            displayName="Use Proxy",
+            name="proxy",
+            datatype="GPBoolean",
+            parameterType="Optional",
+            direction="Input")
+
         outjson = arcpy.Parameter(
             displayName="Input JSON",
             name="out_json",
@@ -185,8 +198,7 @@ class JSONToMapTool(object):
             parameterType="Required",
             direction="Input")
 
-
-        params = [outjson, arcgisServer, username, password, database, inmap]
+        params = [outjson, arcgisServer, username, password, database, inmap, proxy]
 
         return params
 
@@ -213,12 +225,13 @@ class JSONToMapTool(object):
         password = parameters[3].value
         server = parameters[1].value
         database = parameters[4].value
+        proxy = parameters[6].value
         #read ini file
         configreader = Configuration()
         configuration = configreader.readSection(server)
 
         reader =  JSONToMap()
-        reader.execute(arcgisprodocument, jsonfile, username, password, database, configuration)
+        reader.execute(arcgisprodocument, jsonfile, username, password, database, configuration, proxy)
 
         return
 
@@ -244,7 +257,12 @@ class ArcgisServerDatasources(object):
     serverurl = None
     isFederated = None
     newRegistered = []
-    def __init__(self, configuration, username, password):
+    useproxy = False
+    proxy = None
+    def __init__(self, configuration, username, password, useproxy=False):
+        self.useproxy = useproxy
+        if 'proxy' in configuration:
+            self.proxy = configuration['proxy']
         if 'portalurl' in configuration:
             self.portalurl = configuration['portalurl']
         if 'serverurl' in configuration:
@@ -263,20 +281,20 @@ class ArcgisServerDatasources(object):
             if 'tokenurl' in configuration:
                 tokenurl = configuration['tokenurl']
                 arcpy.AddMessage(tokenurl)
-            self.token = self.GetToken(tokenurl, referer, username, password)
+            self.token = self.GetToken(tokenurl, referer, username, password,self.useproxy, self.proxy)
         else:
             referer = None
             tokenurl = '/admin/generateToken'
             if 'tokenurl' in configuration:
                 tokenurl = configuration['tokenurl']
-            self.token = self.GetToken(tokenurl, referer, username, password)
+            self.token = self.GetToken(tokenurl, referer, username, password,self.useproxy, self.proxy)
     def getDatasources(self):
         url = self.serverurl + '/admin/data/findItems'
         parameters = { 'f'     : 'pjson', 'parentPath': r'/enterpriseDatabases', 'types': 'egdb'}
 
         if self.token is not None:
             parameters['token'] = self.token
-        data = self.RequestWithToken(url, parameters)
+        data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
         datasources = json.loads(data)
         for item in datasources['items']:
             path =item['path']
@@ -297,11 +315,11 @@ class ArcgisServerDatasources(object):
             if self.token is not None:
                 parameters['token'] = self.token
 
-            data = self.RequestWithToken(url, parameters)
+            data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
             result = json.loads(data)
             if result['status'] =='success':
                 url = self.serverurl +  '/admin/data/registerItem'
-                data = self.RequestWithToken(url, parameters)
+                data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
                 result = json.loads(data)
                 if  result['success']:
                     self.newRegistered.append(datasource)
@@ -313,15 +331,18 @@ class ArcgisServerDatasources(object):
             else:
                 arcpy.AddWarning("Datastores not valid" + datasource)
 
-    def GetToken(self, tokenURL, referer, username, password):
+    def GetToken(self, tokenURL, referer, username, password, useproxy = False, proxy = None):
         # Token URL is typically http://portalserver.domain.tld/portalwebadapter/sharing/rest/generateToken
         if referer is None:
-            params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8")
+            params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'requestip', 'f': 'json'}).encode("utf-8") #standalone token request
         else:
             params = urllib.parse.urlencode({'username': username, 'password': password, 'client': 'referer', 'referer': referer,'f': 'json'}).encode("utf-8") #portal token request
         headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-        if '.local' not in tokenURL or bypassproxyonlocal:
-            pr = urllib.request.ProxyHandler()
+        #by default system proxy is used, useproxy=False forces the request not to use the proxy, useproxy=True and setting proxy value forces to this proxy
+        if useproxy and proxy is not None:
+            proxy_handler = urllib.request.ProxyHandler({'http': proxy, 'https': proxy})
+            opener = urllib.request.build_opener(proxy_handler)
+            urllib.request.install_opener(opener)
         else:
             proxy_handler = urllib.request.ProxyHandler({})
             opener = urllib.request.build_opener(proxy_handler)
@@ -340,13 +361,13 @@ class ArcgisServerDatasources(object):
         token = json.loads(data)
         return token['token']
 
-    def RequestWithToken(self, url, data,  headers = None, timeout=500):
+    def RequestWithToken(self, url, data,  headers = None, useproxy = True, proxy = None, timeout=500):
         try:
-            #force urllib.request NOT to use a proxy, only internal servers!
-            #try with default proxy's
-            #portal is available via an external url
-            if '.local' not in url or bypassproxyonlocal:
-                pr = urllib.request.ProxyHandler()
+            #by default system proxy is used, useproxy=False forces the request not to use the proxy, useproxy=True and setting proxy value forces to this proxy
+            if useproxy and proxy is not None:
+                proxy_handler = urllib.request.ProxyHandler({'http': proxy, 'https': proxy})
+                opener = urllib.request.build_opener(proxy_handler)
+                urllib.request.install_opener(opener)
             else:
                 proxy_handler = urllib.request.ProxyHandler({})
                 opener = urllib.request.build_opener(proxy_handler)
@@ -378,7 +399,7 @@ class ArcgisServerDatasources(object):
 
 
 class MapToJSON(object):
-    def execute(self, promap, jsonfile, username, password ,configuration):
+    def execute(self, promap, jsonfile, username, password ,configuration, proxy):
         json_map = None
         with open(promap,"r") as inputfile:
             data = inputfile.read()
@@ -468,7 +489,7 @@ class MapToJSON(object):
 
 
 class JSONToMap(object):
-    def execute(self, prodocument, jsonfile, username, password, database, configuration):
+    def execute(self, prodocument, jsonfile, username, password, database, configuration, proxy):
         json_map = None
         with open(jsonfile,"r") as inputfile:
             data = inputfile.read()
