@@ -294,7 +294,7 @@ class ArcgisServerDatasources(object):
 
         if self.token is not None:
             parameters['token'] = self.token
-        data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
+        data = self.RequestWithToken(url, parameters,headers=None, useproxy=self.useproxy, proxy=self.proxy)
         datasources = json.loads(data)
         for item in datasources['items']:
             path =item['path']
@@ -315,11 +315,11 @@ class ArcgisServerDatasources(object):
             if self.token is not None:
                 parameters['token'] = self.token
 
-            data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
+            data = self.RequestWithToken(url, parameters,headers=None, useproxy=self.useproxy, proxy=self.proxy)
             result = json.loads(data)
             if result['status'] =='success':
                 url = self.serverurl +  '/admin/data/registerItem'
-                data = self.RequestWithToken(url, parameters,self.useproxy, self.proxy)
+                data = self.RequestWithToken(url, parameters, headers=None, useproxy=self.useproxy, proxy=self.proxy)
                 result = json.loads(data)
                 if  result['success']:
                     self.newRegistered.append(datasource)
