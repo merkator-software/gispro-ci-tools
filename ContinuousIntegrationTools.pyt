@@ -447,9 +447,10 @@ class MapToJSON(object):
             workspaceConnectionString =  dataConnection['workspaceConnectionString']
             found = False
             for ds in datasources['items']:
-                if self.compareConnectionString(ds['info']['connectionString'],workspaceConnectionString):
-                    dataConnection['workspaceConnectionString'] = ds['cicdname'].split('@')[0]
-                    arcpy.AddMessage('Replaced: ' + ds['cicdname'].split('@')[0] )
+                servercsdict = self.connectionStringToDict(ds['info']['connectionString'])
+                if self.compareConnectionString(ds['info']['connectionString'],workspaceConnectionString) and 'USER' in servercsdict:
+                    dataConnection['workspaceConnectionString'] = servercsdict['USER']
+                    arcpy.AddMessage('Replaced: ' + servercsdict['USER'])
                     found = True
                     continue
             if not found:
@@ -540,12 +541,11 @@ class JSONToMap(object):
             found = False
             arcpy.AddMessage("Restore connection: " + workspaceConnectionString)
             for ds in datasources['items']:
-                if (database !='' and '@' in ds['cicdname'] and ds['cicdname'].split('@')[1].upper() == database.upper() and workspaceConnectionString.upper() == ds['cicdname'].split('@')[0].upper()) or (database =='' and workspaceConnectionString.upper() == ds['cicdname'].split('@')[0].upper()):
+                connectiondict = self.connectionStringToDict( ds['info']['connectionString'])
+                if ('USER' in connectiondict and database !='' and workspaceConnectionString.upper() == connectiondict['USER'].upper() and database in dataConnection['workspaceConnectionString']) or ('USER' in connectiondict and database =='' and workspaceConnectionString.upper() == connectiondict['USER'].upper()):
                     dataConnection['workspaceConnectionString'] = ds['info']['connectionString']
-                    if 'dataset' in dataConnection and len(dataConnection['dataset'].split('.')) == 3:
-                        connectiondict = self.connectionStringToDict( dataConnection['workspaceConnectionString'])
-                        if 'DATABASE'  in connectiondict:
-                            dataConnection['dataset'] = '.'.join([connectiondict['DATABASE']] + dataConnection['dataset'].split('.')[-2:])
+                    if 'DATABASE'  in connectiondict:
+                        dataConnection['dataset'] = '.'.join([connectiondict['DATABASE']] + dataConnection['dataset'].split('.')[-2:])
                     found = True
                     continue
             if not found:
