@@ -542,7 +542,7 @@ class JSONToMap(object):
             arcpy.AddMessage("Restore connection: " + workspaceConnectionString)
             for ds in datasources['items']:
                 connectiondict = self.connectionStringToDict( ds['info']['connectionString'])
-                if ('USER' in connectiondict and database !='' and workspaceConnectionString.upper() == connectiondict['USER'].upper() and database in dataConnection['workspaceConnectionString']) or ('USER' in connectiondict and database =='' and workspaceConnectionString.upper() == connectiondict['USER'].upper()):
+                if ('USER' in connectiondict and database !='' and workspaceConnectionString.upper() == connectiondict['USER'].upper() and database in ds['info']['connectionString']) or ('USER' in connectiondict and database =='' and workspaceConnectionString.upper() == connectiondict['USER'].upper()):
                     dataConnection['workspaceConnectionString'] = ds['info']['connectionString']
                     if 'DATABASE'  in connectiondict:
                         dataConnection['dataset'] = '.'.join([connectiondict['DATABASE']] + dataConnection['dataset'].split('.')[-2:])
