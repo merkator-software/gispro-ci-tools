@@ -401,7 +401,7 @@ class ArcgisServerDatasources(object):
 class MapToJSON(object):
     def execute(self, promap, jsonfile, username, password ,configuration, proxy):
         json_map = None
-        with open(promap,"r") as inputfile:
+        with open(promap,"r",encoding='utf8') as inputfile:
             data = inputfile.read()
             json_map = json.loads(data)
         message = 'Reading:' + promap
@@ -413,7 +413,7 @@ class MapToJSON(object):
 
         message = 'Writing:' + jsonfile
         arcpy.AddMessage(message)
-        with open(jsonfile, 'w' ) as outputfile:
+        with open(jsonfile, 'w',encoding='utf8' ) as outputfile:
             json.dump(json_map, outputfile, indent=4, sort_keys=True,separators=(',', ': '))
 
     def replaceDataSources(self, json_map, datasources, serverDatasources):
@@ -492,7 +492,7 @@ class MapToJSON(object):
 class JSONToMap(object):
     def execute(self, prodocument, jsonfile, username, password, database, configuration, proxy):
         json_map = None
-        with open(jsonfile,"r") as inputfile:
+        with open(jsonfile,"r",encoding='utf8') as inputfile:
             data = inputfile.read()
             json_map = json.loads(data)
 
@@ -504,7 +504,7 @@ class JSONToMap(object):
 
         message = 'Writing:' + prodocument
         arcpy.AddMessage(message)
-        with open(prodocument, 'w' ) as outputfile:
+        with open(prodocument, 'w',encoding='utf8' ) as outputfile:
             json.dump(json_map, outputfile, indent=4, sort_keys=True,separators=(',', ': '))
 
     def replaceDataSources(self, json_map, datasources, database):
